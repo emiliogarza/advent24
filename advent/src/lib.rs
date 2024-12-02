@@ -1,4 +1,5 @@
 use std::{collections::HashMap, error::Error, io};
+use csv::StringRecord;
 use serde::Deserialize;
 
 // Day One Stuff
@@ -126,6 +127,90 @@ fn add_numbers_together(list: Vec<i32>) {
     println!("total sum is: {}", sum);
 }
 
+fn process_report(record: Vec<u16>) -> bool {
+    let mut descending = false;
+    let mut add_as_safe_report = true;
+    let mut i = 0;
+    
+    while i < record.len() - 1 {
+        let current_value = record[i];
+        let next_value = record[i + 1];
+        if i == 0 {
+            if current_value > next_value {
+                // first value will determine the direction.
+                descending = true;
+            }    
+        }
+        if descending {
+            if current_value < next_value {
+                add_as_safe_report = false;
+            } else {
+                if (current_value - next_value) > 3 || current_value - next_value == 0 {
+                    add_as_safe_report = false;
+                }
+            }
+        } else {
+            if current_value > next_value {
+                add_as_safe_report = false;
+            } else {
+                if (next_value - current_value) > 3 || next_value - current_value == 0 {
+                    add_as_safe_report = false;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return add_as_safe_report;
+
+}
+
+fn convert_string_record_to_vec(record: StringRecord) -> Vec<u16> {
+    let mut list: Vec<u16> = vec![];
+    for i in 0..record.len() {
+        list.push(record[i].parse::<u16>().unwrap());
+    }
+    return list;
+}
+
+// Day 2 Stuff
+fn read_space_delimited_csv_and_determine_safe_rows() -> Result<i32, Box<dyn Error>> {
+    let mut count_of_safe_reports = 0;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b' ')
+        .double_quote(false)
+        .escape(Some(b'\\'))
+        .flexible(true)
+        .comment(Some(b'#'))
+        .from_reader(io::stdin());
+    for result in rdr.records() {
+        let record = result?;
+        let report = convert_string_record_to_vec(record);
+
+        let add_as_safe_report = process_report(report.clone());
+        // if still qualified, add it to our count
+        if add_as_safe_report {
+            count_of_safe_reports = count_of_safe_reports + 1;
+            println!("Safe report row found {:?}", &report);
+        } else {
+            // Attempt another try, removing elements 1 by 1.
+            for i in 0..report.len() {
+                let success: bool;
+                let mut temp_record = report.clone();
+                temp_record.remove(i);
+                success = process_report(temp_record);
+                if success {
+                    count_of_safe_reports = count_of_safe_reports + 1;
+                    println!("!!!!! New Safe report row found {:?}", &report);
+                    break;
+                }
+            }
+        }
+    }
+    Ok(count_of_safe_reports)
+}
+
+
 pub fn day_one_part_one() {
     if let Ok((list_one, list_two)) = assign_columns_to_vec() {
         let sorted_list_one = sort_vec(list_one);
@@ -142,5 +227,11 @@ pub fn day_one_part_two() {
         let similarity_map = create_similarity_score_list(sorted_list_one, sorted_list_two);
         let similarity_score_list = multiple_and_formulate_similarity_score_list(similarity_map);
         add_numbers_together(similarity_score_list);
+    }
+}
+
+pub fn day_two() {
+    if let Ok(count_of_safe_reports) = read_space_delimited_csv_and_determine_safe_rows() {
+        println!("Success total is: {}", count_of_safe_reports)
     }
 }
